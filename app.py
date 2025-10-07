@@ -2,14 +2,44 @@ import streamlit as st
 import numpy as np
 import joblib
 
-# Load the trained model
+# =========================================================
+# 🎯 PAGE CONFIGURATION
+# =========================================================
+st.set_page_config(
+    page_title="🏡 House Price Predictor",
+    page_icon="🏠",
+    layout="centered",
+    initial_sidebar_state="expanded"
+)
+
+# =========================================================
+# 🏫 SIDEBAR INFO
+# =========================================================
+st.sidebar.title("👨‍💻 Developer Info")
+st.sidebar.markdown("""
+**Name:** Abiraj Jatheeskumar  
+**University:** Uva Wellassa University of Sri Lanka  
+**Department:** Faculty of Applied Sciences – Department of Computing  
+**Project:** 🏡 *House Price Prediction System*  
+""")
+
+st.sidebar.markdown("---")
+st.sidebar.caption("📧 Contact: abirajjatheeskumar@gmail.com")
+
+# =========================================================
+# 📦 LOAD TRAINED MODEL
+# =========================================================
 model = joblib.load("house_price_model.pkl")
 
-st.set_page_config(page_title="🏡 Housing Price Predictor", page_icon="🏠")
-st.title("🏡 Housing Price Prediction App")
-st.write("Enter the house details below to predict the price:")
+# =========================================================
+# 🏡 MAIN PAGE
+# =========================================================
+st.title("🏡 House Price Prediction App")
+st.write("Welcome to the **House Price Predictor**, built with Python and Streamlit.  Provide your house details below to estimate its market value.")
 
+# ---------------------------
 # Input fields
+# ---------------------------
 area = st.number_input("Area (sq.ft)", min_value=0.0, step=1.0)
 bedrooms = st.number_input("Number of Bedrooms", min_value=0, step=1)
 bathrooms = st.number_input("Number of Bathrooms", min_value=0, step=1)
@@ -23,31 +53,34 @@ parking = st.number_input("Parking Spaces", min_value=0, step=1)
 prefarea = st.selectbox("Preferred Area", ["yes", "no"])
 furnishingstatus = st.selectbox("Furnishing Status", ["furnished", "semi-furnished", "unfurnished"])
 
-# Encode categorical variables manually (same order as training)
+# ---------------------------
+# Encode categorical inputs
+# ---------------------------
 def encode_inputs(mainroad, guestroom, basement, hotwaterheating, airconditioning, prefarea, furnishingstatus):
-    def encode_yes_no(value):
-        return 1 if value == "yes" else 0
-
+    def yes_no(val): return 1 if val == "yes" else 0
     encoded = [
-        encode_yes_no(mainroad),
-        encode_yes_no(guestroom),
-        encode_yes_no(basement),
-        encode_yes_no(hotwaterheating),
-        encode_yes_no(airconditioning),
-        encode_yes_no(prefarea),
+        yes_no(mainroad),
+        yes_no(guestroom),
+        yes_no(basement),
+        yes_no(hotwaterheating),
+        yes_no(airconditioning),
+        yes_no(prefarea),
     ]
-
-    # Encode furnishing status manually (same label order)
     furnishing_map = {"furnished": 0, "semi-furnished": 1, "unfurnished": 2}
     encoded.append(furnishing_map[furnishingstatus])
-
     return encoded
 
-if st.button("Predict Price"):
+# =========================================================
+# 🔮 PREDICTION SECTION
+# =========================================================
+if st.button("🔮 Predict Price"):
     encoded = encode_inputs(mainroad, guestroom, basement, hotwaterheating, airconditioning, prefarea, furnishingstatus)
-    
-    # Combine numerical + categorical in the same order as training
     features = np.array([[area, bedrooms, bathrooms, stories, parking] + encoded])
-    
     prediction = model.predict(features)[0]
     st.success(f"🏠 Estimated House Price: ₹{prediction:,.2f}")
+
+# =========================================================
+# 🪄 FOOTER
+# =========================================================
+st.markdown("---")
+st.caption("Developed by **Abiraj Jatheeskumar** | Uva Wellassa University of Sri Lanka © 2025")
