@@ -4,6 +4,19 @@ import numpy as np
 import joblib
 import matplotlib.pyplot as plt
 
+# =========================================================
+# 🎯 PAGE CONFIGURATION
+# =========================================================
+st.set_page_config(
+    page_title="🏡 House Price Predictor - Uva Wellassa University",
+    page_icon="🏠",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# =========================================================
+# 🎨 CUSTOM CSS
+# =========================================================
 st.markdown("""
     <style>
         body {
@@ -19,16 +32,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =========================================================
-# 🎯 PAGE CONFIGURATION
-# =========================================================
-st.set_page_config(
-    page_title="🏡 House Price Predictor - Uva Wellassa University",
-    page_icon="🏠",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# =========================================================
 # 🧱 SIDEBAR (DEVELOPER INFO)
 # =========================================================
 st.sidebar.title("👨‍💻 Developer Info")
@@ -39,23 +42,72 @@ st.sidebar.markdown("""
 **Project:** 🏡 *Smart House Price Prediction System*  
 """)
 st.sidebar.markdown("---")
-st.sidebar.caption("📧 Contact: abirajjatheeskumar@gmail.com")
+st.sidebar.caption("📧 Contact: abiraj30@gmail.com")
+# =========================================================
+# 🌟 APP HEADER
+# =========================================================
+st.markdown("<h1 style='text-align:center; color:#FF914D;'>🏡 Smart House Price Prediction System</h1>", unsafe_allow_html=True)
+st.markdown("<h4 style='text-align:center; color:gray;'>Uva Wellassa University of Sri Lanka</h4>", unsafe_allow_html=True)
+
 
 # =========================================================
 # 📦 LOAD TRAINED MODEL
 # =========================================================
-model, scaler = joblib.load("house_price_model.pkl")
+model, feature_scaler, target_scaler = joblib.load("house_price_model.pkl")
+
+# Display model info in sidebar
+st.sidebar.info(f"✅ Model Loaded: {type(model).__name__}")
+
+# =========================================================
+# 🧹 PREPROCESSING FUNCTION
+# =========================================================
+EXPECTED_COLS = [
+    "area","bedrooms","bathrooms","stories",
+    "mainroad","guestroom","basement","hotwaterheating",
+    "airconditioning","parking","prefarea","furnishingstatus"
+]
+
+def preprocess_bulk(df_raw: pd.DataFrame) -> pd.DataFrame:
+    df = df_raw.copy()
+    missing = [c for c in EXPECTED_COLS if c not in df.columns]
+    if missing:
+        st.error(f"CSV is missing columns: {missing}")
+        st.stop()
+
+    for c in ["mainroad","guestroom","basement","hotwaterheating","airconditioning","prefarea","furnishingstatus"]:
+        df[c] = df[c].astype(str).str.strip().str.lower()
+
+    yn_cols = ["mainroad","guestroom","basement","hotwaterheating","airconditioning","prefarea"]
+    for c in yn_cols:
+        df[c] = df[c].map({"yes": 1, "no": 0})
+
+    furnish_map = {"furnished": 0, "semi-furnished": 1, "unfurnished": 2}
+    df["furnishingstatus"] = df["furnishingstatus"].map(furnish_map)
+
+    return df[EXPECTED_COLS]
 
 # =========================================================
 # 🎨 PAGE TABS
 # =========================================================
 tab1, tab2, tab3 = st.tabs(["🏠 Prediction", "📊 Model Info", "ℹ️ About"])
 
+
 # =========================================================
 # 🏠 TAB 1: PREDICTION
 # =========================================================
 with tab1:
     st.header("🏠 Predict House Price")
+
+    # =========================================================
+    # 💱 CURRENCY SELECTION
+    # =========================================================
+    currency_option = st.selectbox(
+        "💱 Select Currency",
+        ("INR (₹)", "LKR (Rs.)", "USD ($)")
+    )
+    st.caption("💡 This currency will be used for both single and bulk predictions.")
+
+
 
     # Input fields
     area = st.number_input("Area (sq.ft)", min_value=0.0, step=1.0)
@@ -81,29 +133,58 @@ with tab1:
             yes_no(airconditioning),
             yes_no(prefarea),
         ]
-        furnishing_map = {"furnished": 0, "semi-furnished": 1, "unfurnished": 2}
-        encoded.append(furnishing_map[furnishingstatus])
+        furnish_map = {"furnished": 0, "semi-furnished": 1, "unfurnished": 2}
+        encoded.append(furnish_map[furnishingstatus])
         return encoded
 
     if st.button("🔮 Predict Price"):
-     with st.spinner("Calculating... Please wait ⏳"):
-        encoded = encode_inputs(mainroad, guestroom, basement, hotwaterheating, airconditioning, prefarea, furnishingstatus)
-        features = np.array([[area, bedrooms, bathrooms, stories, parking] + encoded])
-        # Scale numeric inputs before predicting
-        features_scaled = scaler.transform(features)
-        prediction = model.predict(features_scaled)[0]
-        st.success(f"🏠 Estimated House Price: ₹{prediction:,.2f}")
+        with st.spinner("Calculating... Please wait ⏳"):
+            encoded = encode_inputs(mainroad, guestroom, basement, hotwaterheating, airconditioning, prefarea, furnishingstatus)
+            features = np.array([[area, bedrooms, bathrooms, stories, parking] + encoded])
+            features_scaled = feature_scaler.transform(features)
+            prediction_scaled = model.predict(features_scaled)[0]
+            prediction_inr = target_scaler.inverse_transform([[prediction_scaled]])[0][0]
 
+            # Currency conversion
+            if currency_option == "LKR (Rs.)":
+                prediction = prediction_inr * 3.7
+                symbol = "Rs."
+            elif currency_option == "USD ($)":
+                prediction = prediction_inr / 83
+                symbol = "$"
+            else:
+                prediction = prediction_inr
+                symbol = "₹"
+
+            st.success(f"🏠 Estimated House Price: {symbol}{prediction:,.2f}")
 
     # --- Bulk prediction from CSV ---
     st.subheader("📂 Upload CSV for Bulk Prediction")
     uploaded_file = st.file_uploader("Upload a CSV file with the same feature columns", type=["csv"])
+    st.caption("📘 Example CSV columns: area, bedrooms, bathrooms, stories, mainroad, guestroom, basement, hotwaterheating, airconditioning, parking, prefarea, furnishingstatus")
+
     if uploaded_file is not None:
-        data = pd.read_csv(uploaded_file)
-        preds = model.predict(data)
-        data["Predicted Price"] = preds
-        st.dataframe(data)
-        st.download_button("📥 Download Predictions", data.to_csv(index=False), file_name="predictions.csv")
+        raw = pd.read_csv(uploaded_file)
+        X = preprocess_bulk(raw)
+        X_scaled = feature_scaler.transform(X)
+        y_scaled = model.predict(X_scaled)
+        y_pred = target_scaler.inverse_transform(y_scaled.reshape(-1, 1)).ravel()
+
+        # Currency conversion
+        if currency_option == "LKR (Rs.)":
+            y_pred *= 3.7
+            symbol = "Rs."
+        elif currency_option == "USD ($)":
+            y_pred /= 83
+            symbol = "$"
+        else:
+            symbol = "₹"
+
+        out = raw.copy()
+        out[f"Predicted Price ({symbol})"] = np.round(y_pred, 2)
+        st.dataframe(out.style.background_gradient(cmap='Blues'))
+        st.success(f"✅ Bulk predictions generated successfully in {symbol} currency.")
+        st.download_button("📥 Download Predictions", out.to_csv(index=False), file_name="predictions.csv")
 
 # =========================================================
 # 📊 TAB 2: MODEL INFORMATION
@@ -112,19 +193,19 @@ with tab2:
     st.header("📊 Model Performance Overview")
     st.write("This section shows model accuracy and feature importance (if available).")
 
-    st.markdown("### R² Score (Approximate Training Accuracy): **64%**")
+    st.markdown("### 🔍 Feature Importance (Model-Derived Visualization)")
+    if hasattr(model, "feature_importances_"):
+        features = EXPECTED_COLS
+        importance = model.feature_importances_
+        fig, ax = plt.subplots(figsize=(8, 5))
+        ax.barh(features, importance, color="#FF914D")
+        ax.set_xlabel("Importance")
+        ax.set_title("Feature Importance")
+        st.pyplot(fig)
+    else:
+        st.warning("Feature importance not available for this model.")
+    st.info("💡 Model trained using RandomForestRegressor with approximately 64% accuracy on test data.")
 
-    st.markdown("### 🔍 Feature Importance (Example Visualization)")
-    features = ["area", "bedrooms", "bathrooms", "stories", "parking",
-                "mainroad", "guestroom", "basement", "hotwaterheating",
-                "airconditioning", "prefarea", "furnishingstatus"]
-
-    importance = np.random.rand(len(features))
-    fig, ax = plt.subplots(figsize=(8, 5))
-    ax.barh(features, importance, color="#FF914D")
-    ax.set_xlabel("Importance")
-    ax.set_title("Feature Importance (Demo)")
-    st.pyplot(fig)
 
 # =========================================================
 # ℹ️ TAB 3: ABOUT
@@ -141,14 +222,14 @@ This project predicts house prices using machine learning trained on the *Housin
 
 #### 🧠 Tech Stack
 - Python, Pandas, NumPy  
-- Scikit-learn (Random Forest / Linear Regression)  
+- Scikit-learn (Random Forest Regressor)  
 - Streamlit for UI  
 - Matplotlib for charts  
 
 #### 👨‍💻 Developer
 **Abiraj Jatheeskumar**  
 Uva Wellassa University of Sri Lanka – Department of Computing  
-📧 abirajjatheeskumar@gmail.com
+📧 abiraj30@gmail.com
 """)
 
 # =========================================================
