@@ -24,7 +24,7 @@ st.sidebar.markdown("""
 """)
 
 st.sidebar.markdown("---")
-st.sidebar.caption("📧 Contact: abirajjatheeskumar@gmail.com")
+st.sidebar.caption("📧 Contact: abiraj30@gmail.com")
 
 # =========================================================
 # 📦 LOAD TRAINED MODEL
