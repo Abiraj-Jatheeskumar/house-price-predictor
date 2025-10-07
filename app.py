@@ -4,6 +4,20 @@ import numpy as np
 import joblib
 import matplotlib.pyplot as plt
 
+st.markdown("""
+    <style>
+        body {
+            background-color: #F9FAFB;
+        }
+        .stButton>button {
+            color: white;
+            background-color: #FF914D;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 # =========================================================
 # 🎯 PAGE CONFIGURATION
 # =========================================================
@@ -30,7 +44,7 @@ st.sidebar.caption("📧 Contact: abirajjatheeskumar@gmail.com")
 # =========================================================
 # 📦 LOAD TRAINED MODEL
 # =========================================================
-model = joblib.load("house_price_model.pkl")
+model, scaler = joblib.load("house_price_model.pkl")
 
 # =========================================================
 # 🎨 PAGE TABS
@@ -72,10 +86,14 @@ with tab1:
         return encoded
 
     if st.button("🔮 Predict Price"):
+     with st.spinner("Calculating... Please wait ⏳"):
         encoded = encode_inputs(mainroad, guestroom, basement, hotwaterheating, airconditioning, prefarea, furnishingstatus)
         features = np.array([[area, bedrooms, bathrooms, stories, parking] + encoded])
-        prediction = model.predict(features)[0]
+        # Scale numeric inputs before predicting
+        features_scaled = scaler.transform(features)
+        prediction = model.predict(features_scaled)[0]
         st.success(f"🏠 Estimated House Price: ₹{prediction:,.2f}")
+
 
     # --- Bulk prediction from CSV ---
     st.subheader("📂 Upload CSV for Bulk Prediction")
